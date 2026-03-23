@@ -36,6 +36,7 @@
           <a class="enlace" href="/monedas">Monedas</a>
           <a class="enlace" href="/coleccion">Colección</a>
           <a class="enlace" href="/coleccion/tabla">Tabla pais</a>
+          <a class="enlace" href="/identify">Reconocer moneda</a>
           <% if ((locals.loginUser) && (locals.loginUser.displayName !== "Invitado" && locals.loginUser.displayName !== "admin")) { %>
             <a class="enlace" href="/users/<%= locals.loginUser.id %>/coleccion">Mi colección</a>
           <% } %>

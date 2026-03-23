@@ -375,6 +375,138 @@ exports.edit_series = async (req, res, next) => {
 */
 
 // POST /coleccion    create
+
+exports.create = async (req, res, next) => {
+    const mi_coleccion = '';
+
+    let { coleccionista, pais, ceca, valor, año, tipo } = req.body;
+
+    if (pais === "Alemania"
+        ? (coleccionista && pais && valor && año && ceca)
+        : (coleccionista && pais && valor && año)) {
+
+        // 🔧 NORMALIZACIÓN DE PAÍSES
+        const normalizarPais = (nombre) => {
+            const map = {
+                'Mónaco': 'Monaco',
+                'Bélgica': 'Belgica',
+                'San Marino': 'San_Marino',
+                'Países Bajos': 'Holanda',
+                'Paises Bajos': 'Holanda'
+            };
+            return map[nombre] || nombre;
+        };
+
+        const paisNormalizado = normalizarPais(pais);
+
+        let options = {
+            where: {},
+            include: []
+        };
+
+        if (pais === "Alemania" && ceca) {
+            options.where.ceca = ceca;
+        } else {
+            options.where.ceca = '';
+            ceca = '';
+        }
+
+        options.where.moneda = valor;
+        options.where.año = año;
+
+        options.include.push({
+            model: models.Usuario,
+            as: "coleccionista",
+            where: { nombre: coleccionista }
+        });
+
+        options.include.push({
+            model: models.Paises,
+            as: "pais",
+            where: { nombre: paisNormalizado }
+        });
+
+        try {
+            // 🔍 Buscar usuario
+            const usuario = await models.Usuario.findOne({
+                where: { nombre: coleccionista }
+            });
+
+            if (!usuario) {
+                req.flash('error', `No existe el coleccionista "${coleccionista}".`);
+                return res.redirect('/identify');
+            }
+
+            const id_coleccionista = usuario.id;
+
+            // 🔍 Buscar país
+            const pais_db = await models.Paises.findOne({
+                where: { nombre: paisNormalizado }
+            });
+
+            if (!pais_db) {
+                req.flash('error', `No existe el país "${pais}" en la base de datos.`);
+                return res.redirect('/identify');
+            }
+
+            const id_pais = pais_db.id;
+
+            // 🔍 Comprobar si ya existe
+            const moneda_existente = await models.Coleccion.findOne(options);
+
+            if (!moneda_existente) {
+
+                const moneda = await models.Coleccion.create({
+                    ceca: ceca,
+                    año: Number(año),
+                    moneda: valor,
+                    coleccionistaId: id_coleccionista,
+                    paisId: id_pais
+                });
+
+                req.flash('success', 'Moneda creada correctamente.');
+
+                // 📝 LOG
+                try {
+                    const [_, fecha_guiones] = fecha_hoy();
+                    const log = `CREAR: FECHA: ${fecha_guiones}, USUARIO: ${req.loginUser.displayName}, COLECCIONISTA: ${moneda.coleccionistaId}, PAIS: ${moneda.paisId}, AÑO: ${moneda.año}, MONEDA: ${moneda.moneda}, CECA: ${moneda.ceca}\n`;
+                    await appendFileP(FICHERO_LOG, log);
+                } catch (error) {
+                    req.flash('error', 'Error al escribir el log.');
+                }
+
+                // Mostrar solo la moneda recién creada, como antes
+                const coleccion = await models.Coleccion.findAll(options);
+                const count = 0;
+
+                return res.render('coleccion/show', { coleccion, tipo, mi_coleccion, count, valor });
+
+                
+            } else {
+                req.flash('error', 'La moneda ya existe.');
+                return res.redirect('/identify');
+            }
+
+        } catch (error) {
+            if (error instanceof Sequelize.ValidationError) {
+                req.flash('error', 'Hay errores de validación.');
+                error.errors.forEach(({ message }) => req.flash('error', message));
+                return res.redirect('/identify');
+            } else {
+                req.flash('error', 'Error al crear una nueva moneda.');
+                return next(error);
+            }
+        }
+
+    } else {
+        req.flash('error', 'Los campos no pueden estar vacíos, salvo CECA si el país no es Alemania.');
+        return res.redirect('/identify');
+    }
+};
+
+
+
+/*
 exports.create = async (req, res, next) => {
     const mi_coleccion = '';
         
@@ -477,7 +609,7 @@ exports.create = async (req, res, next) => {
     }
 
 };
-
+*/
         /*
 // PUT /coleccion/series/:monedaId(\\d+)
 exports.update_series = async (req, res, next) => {
@@ -542,6 +674,7 @@ exports.destroy = async (req, res, next) => {
 
 */
 
+// GET /coleccion/seeders
 // Este seeders lo pongo para adaptar al funcionamiento de Render. 
 // Render no mantiene los ficheros creados y voy a hacer que una vez creado directamente lo descargo y ya lo guardo como quiera.
 

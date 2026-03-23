@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Identificar moneda</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel='stylesheet' href='/stylesheets/style.css'/>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .bloque { margin-bottom: 30px; padding: 15px; border: 1px solid #ccc; }
+    pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    .resultado {
+      margin-top: 15px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+    }
+    .resultado h3 {
+      margin-top: 0;
+    }
+    .linea {
+      margin: 6px 0;
+    }
+    .preview {
+      margin-top: 12px;
+      max-width: 260px;
+      max-height: 260px;
+      display: none;
+      border: 1px solid #ccc;
+      padding: 6px;
+      background: #fff;
+    }
+    .error {
+      color: #a00;
+      font-weight: bold;
+    }
+    .catalogo {
+      margin-top: 18px;
+    }
+    .catalogo-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 10px;
+    }
+    .catalogo-item {
+      width: 180px;
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .catalogo-item img {
+      max-width: 100%;
+      max-height: 140px;
+      display: block;
+      margin: 0 auto 10px auto;
+      object-fit: contain;
+      border: 1px solid #eee;
+      background: #fff;
+    }
+    .catalogo-item .titulo {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Prueba de identificación de monedas</h1>
+
+  <div class="bloque">
+    <h2>1. Identificar valor desde reverso</h2>
+    <form id="formValue">
+      <input id="fileValue" type="file" name="image" accept="image/*" required>
+      <br><br>
+      <button type="submit">Identificar valor</button>
+    </form>
+
+    <img id="previewValue" class="preview" alt="Vista previa reverso">
+
+    <div id="resultValueBox" class="resultado" style="display:none;"></div>
+    <pre id="resultValue"></pre>
+  </div>
+
+  <div class="bloque">
+    <h2>2. Identificar país / tipo desde cara nacional</h2>
+    <form id="formNational">
+      <label>Valor conocido:</label>
+      <select id="valorSelect" name="valor" required>
+        <option value="">-- Selecciona valor --</option>
+        <option value="1c">1c</option>
+        <option value="2c">2c</option>
+        <option value="5c">5c</option>
+        <option value="10c">10c</option>
+        <option value="20c">20c</option>
+        <option value="50c">50c</option>
+        <option value="1€">1€</option>
+        <option value="2€">2€</option>
+      </select>
+
+      <br><br>
+
+      <label>País (opcional):</label>
+      <input type="text" name="pais" placeholder="Ej: España">
+
+      <br><br>
+
+      <input id="fileNational" type="file" name="image" accept="image/*" required>
+      <br><br>
+      <button type="submit">Identificar cara nacional</button>
+    </form>
+
+    <img id="previewNational" class="preview" alt="Vista previa cara nacional">
+
+    <div id="resultNationalBox" class="resultado" style="display:none;"></div>
+    <div id="catalogBox" class="catalogo" style="display:none;"></div>
+    <div id="confirmBox" class="resultado" style="display:none;"></div>
+    <pre id="resultNational"></pre>
+  </div>
+
+  <script>
+  let ultimoResultadoNational = null;
+  
+  function showPreview(fileInput, imgEl) {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) {
+      imgEl.style.display = 'none';
+      imgEl.src = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      imgEl.src = e.target.result;
+      imgEl.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function escapeHtml(text) {
+    return String(text ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+
+    function buildConfirmButton(json) {
+      if (!json || json.error || !json.pais || !json.valor) {
+        return '';
+      }
+
+      return `
+        <div style="margin-top:12px;">
+          <button type="button" id="btnConfirmarMoneda" onclick="handleConfirmarMoneda()">Confirmar moneda</button>
+        </div>
+      `;
+    }
+
+    function renderValueResult(container, json) {
+      container.style.display = 'block';
+
+      if (json.error) {
+        container.innerHTML = `<div class="error">${json.error}</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <h3>Resultado</h3>
+        <div class="linea"><b>Valor:</b> ${json.valor ?? 'desconocido'}</div>
+        <div class="linea"><b>Confianza:</b> ${json.confianza ?? json.score ?? 'sin dato'}</div>
+      `;
+
+      // 🔥 NUEVO: rellenar automáticamente el select
+      if (json.valor) {
+        const select = document.getElementById('valorSelect');
+        if (select) {
+          select.value = json.valor;
+        }
+      }
+    }
+
+
+  function renderCatalog(container, json) {
+    container.innerHTML = '';
+
+    const items = json.candidatos_catalogo || [];
+    if (!items.length) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+
+    let html = '<h3>Coincidencias del catálogo local</h3>';
+    html += '<div class="catalogo-grid">';
+
+    for (const item of items) {
+      html += `
+        <div class="catalogo-item">
+          ${item.file ? `<img src="/${item.file.replace(/^public\//, '')}" alt="${item.pais || ''} ${item.moneda || ''}">` : ''}
+          <div class="titulo">${item.pais ?? 'Sin país'}</div>
+          <div><b>Valor:</b> ${item.valor ?? ''}</div>
+          <div><b>Moneda:</b> ${item.moneda ?? item.valor ?? ''}</div>
+          <div><b>Año:</b> ${item.anio ?? '—'}</div>
+        </div>
+      `;
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  function renderNationalResult(container, json) {
+    container.style.display = 'block';
+
+    if (json.error) {
+      container.innerHTML = `<div class="error">${json.error}</div>`;
+      return;
+    }
+
+    let html = '<h3>Resultado</h3>';
+
+    html += `<div class="linea"><b>País:</b> ${json.pais ?? 'desconocido'}</div>`;
+
+    if (json.valor) {
+      html += `<div class="linea"><b>Valor:</b> ${json.valor}</div>`;
+    }
+
+    if (json.tipo2e) {
+      html += `<div class="linea"><b>Tipo 2€:</b> ${json.tipo2e}</div>`;
+    }
+
+    if (json.moneda) {
+      html += `<div class="linea"><b>Moneda:</b> ${json.moneda}</div>`;
+    }
+
+    if (json.anio !== null && json.anio !== undefined) {
+      html += `<div class="linea"><b>Año:</b> ${json.anio}</div>`;
+    }
+
+    if (json.ceca) {
+      html += `<div class="linea"><b>CECA:</b> ${json.ceca}</div>`;
+    }
+
+    if (json.descripcion) {
+      html += `<div class="linea"><b>Descripción:</b> ${json.descripcion}</div>`;
+    }
+
+    html += `<div class="linea"><b>Confianza:</b> ${json.confianza ?? json.score ?? 'sin dato'}</div>`;
+
+    html += buildConfirmButton(json);
+
+    container.innerHTML = html;
+  }
+
+
+async function sendForm(form, url) {
+  const data = new FormData(form);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    body: data
+  });
+
+  const text = await res.text();
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { error: 'La respuesta no es JSON válido', raw: text };
+  }
+}
+
+
+async function confirmCoin(json) {
+  const formData = new FormData();
+  formData.append('pais', json.pais || '');
+  formData.append('valor', json.valor || '');
+  formData.append('tipo2e', json.tipo2e || '');
+  formData.append('anio', json.anio ?? '');
+  formData.append('ceca', json.ceca || '');
+  formData.append('monedaDetectada', json.moneda || '');
+
+  const res = await fetch('/identify/confirm', {
+    method: 'POST',
+    body: formData
+  });
+
+  const text = await res.text();
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('Respuesta no JSON de /identify/confirm:', text);
+    return {
+      ok: false,
+      error: 'La respuesta de confirmación no es JSON válido',
+      raw: text
+    };
+  }
+}
+  
+
+  async function handleConfirmarMoneda() {
+    console.log('CLICK confirmar moneda');
+
+    try {
+      if (!ultimoResultadoNational) {
+        console.log('No existe ultimoResultadoNational');
+        return;
+      }
+
+      console.log('Enviando a confirm:', ultimoResultadoNational);
+
+      const confirmJson = await confirmCoin(ultimoResultadoNational);
+
+      console.log('Respuesta /identify/confirm:', confirmJson);
+
+      renderConfirmedCoin(document.getElementById('confirmBox'), confirmJson);
+    } catch (err) {
+      console.error('Error al confirmar moneda:', err);
+    }
+  }
+
+function renderConfirmedCoin(container, json) {
+  if (!json || !json.ok) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  const m = json.monedaConfirmada;
+  const loginUser = json.loginUser || {};
+  const usuarios = json.usuarios || [];
+
+  const pais = escapeHtml(m.pais || '');
+  const valor = escapeHtml(m.valor || '');
+  const moneda = escapeHtml(m.moneda || '');
+  const anio = m.anio ? escapeHtml(m.anio) : '';
+  const ceca = escapeHtml(m.ceca || '');
+  const tipo = escapeHtml(m.tipo || '');
+
+  const esConmemorativa = (valor === '2€' && tipo === 'conmemorativa');
+  const esAlemania = (pais === 'Alemania');
+
+  let html = '<h3>Moneda confirmada</h3>';
+
+  html += `<div class="linea"><b>País:</b> ${pais}</div>`;
+  html += `<div class="linea"><b>Valor:</b> ${valor}</div>`;
+
+  if (esConmemorativa) {
+    html += `<div class="linea"><b>Moneda detectada:</b> 2€ conmemorativa</div>`;
+  } else {
+    html += `<div class="linea"><b>Moneda detectada:</b> ${moneda || valor}</div>`;
+  }
+
+  html += `
+    <div class="linea">
+      <b>Año:</b>
+      <input type="number" id="anioConfirmado" value="${anio || ''}" min="1999" max="2100" style="width:90px;">
+    </div>
+  `;
+
+  if (esAlemania) {
+    html += `
+      <div class="linea">
+        <b>CECA:</b>
+        <select id="cecaConfirmada">
+          <option value="">--</option>
+          <option value="A" ${ceca === 'A' ? 'selected' : ''}>A</option>
+          <option value="D" ${ceca === 'D' ? 'selected' : ''}>D</option>
+          <option value="F" ${ceca === 'F' ? 'selected' : ''}>F</option>
+          <option value="G" ${ceca === 'G' ? 'selected' : ''}>G</option>
+          <option value="J" ${ceca === 'J' ? 'selected' : ''}>J</option>
+        </select>
+      </div>
+    `;
+  } else if (ceca) {
+    html += `<div class="linea"><b>CECA:</b> ${ceca}</div>`;
+  }
+
+  if (esConmemorativa) {
+    html += `
+      <div style="margin-top:14px; margin-bottom:14px;">
+        <label><b>Tipo conmemorativa:</b></label>
+        <select id="tipoConmemorativaSelect" required>
+          <option value="">-- Selecciona tipo --</option>
+          <option value="2€ Com1">2€ Com1</option>
+          <option value="2€ Com2">2€ Com2</option>
+          <option value="2€ Com3">2€ Com3</option>
+        </select>
+      </div>
+    `;
+  }
+
+  html += `
+    <div style="margin-top:16px;">
+      <button type="button" onclick="verUsuariosConMonedaConfirmada('${pais}', '${tipo}', '${moneda || valor}', ${esConmemorativa})">
+        Ver qué usuarios la tienen
+      </button>
+    </div>
+  `;
+
+  html += `<div style="margin-top:20px;"><h4>Añadir a colección</h4>`;
+  html += `<form method="POST" action="/coleccion" target="_blank" onsubmit="return prepararEnvioColeccion(this, ${esConmemorativa}, ${esAlemania})">`;
+    
+
+  if (loginUser.isAdmin) {
+    html += `
+      <div style="margin-bottom:10px;">
+        <label>Coleccionista:</label>
+        <select name="coleccionista" required>
+          <option value="">-- Selecciona --</option>
+    `;
+
+    for (const u of usuarios) {
+      html += `<option value="${escapeHtml(u.nombre)}">${escapeHtml(u.nombre)}</option>`;
+    }
+
+    html += `</select></div>`;
+  } else {
+    html += `
+      <div class="linea"><b>Coleccionista:</b> ${escapeHtml(loginUser.displayName || '')}</div>
+      <input type="hidden" name="coleccionista" value="${escapeHtml(loginUser.displayName || '')}">
+    `;
+  }
+
+  if (!esConmemorativa) {
+    html += `<input type="hidden" name="valor" value="${moneda || valor}">`;
+  } else {
+    html += `<input type="hidden" name="valor" value="">`;
+  }
+
+  html += `
+    <input type="hidden" name="pais" value="${pais}">
+    <input type="hidden" name="año" value="${anio}">
+    <input type="hidden" name="ceca" value="${ceca}">
+    <input type="hidden" name="tipo" value="${tipo}">
+    <button type="submit">Añadir a la colección</button>
+  `;
+
+  html += `</form></div>`;
+
+  container.style.display = 'block';
+  container.innerHTML = html;
+}
+
+
+
+
+function prepararEnvioColeccion(form, esConmemorativa, esAlemania) {
+  const anioInput = document.getElementById('anioConfirmado');
+  const anio = anioInput ? anioInput.value.trim() : '';
+  form.querySelector('input[name="año"]').value = anio;
+
+  if (esAlemania) {
+    const cecaSelect = document.getElementById('cecaConfirmada');
+    const ceca = cecaSelect ? cecaSelect.value : '';
+    form.querySelector('input[name="ceca"]').value = ceca;
+  }
+
+  if (!esConmemorativa) {
+    return true;
+  }
+
+  const select = document.getElementById('tipoConmemorativaSelect');
+  if (!select || !select.value) {
+    alert('Debes seleccionar si es 2€ Com1, 2€ Com2 o 2€ Com3.');
+    return false;
+  }
+
+  form.querySelector('input[name="valor"]').value = select.value;
+  return true;
+}
+
+function verUsuariosConMonedaConfirmada(pais, tipo, valorBase, esConmemorativa) {
+  const anioInput = document.getElementById('anioConfirmado');
+  const anio = anioInput ? anioInput.value.trim() : '';
+
+  let valorFinal = valorBase;
+
+  if (esConmemorativa) {
+    const select = document.getElementById('tipoConmemorativaSelect');
+
+    if (!select || !select.value) {
+      alert('Debes seleccionar antes el tipo de conmemorativa.');
+      return;
+    }
+
+    valorFinal = select.value;
+  }
+
+  let ceca = '';
+  if (pais === 'Alemania') {
+    const cecaSelect = document.getElementById('cecaConfirmada');
+    ceca = cecaSelect ? cecaSelect.value : '';
+  }
+
+  const params = new URLSearchParams();
+  params.set('pais', pais);
+  params.set('valor', valorFinal);
+
+  if (anio) params.set('año', anio);
+  if (ceca) params.set('ceca', ceca);
+  if (tipo) params.set('tipo', tipo);
+
+  window.open('/coleccion/show?' + params.toString(), '_blank');
+}
+
+
+  document.getElementById('fileValue').addEventListener('change', function () {
+    showPreview(this, document.getElementById('previewValue'));
+  });
+
+  document.getElementById('fileNational').addEventListener('change', function() {
+    showPreview(this, document.getElementById('previewNational'));
+  });
+
+
+  document.getElementById('formValue').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const json = await sendForm(e.target, '/api/identify/value');
+
+    document.getElementById('resultValue').textContent =
+      JSON.stringify(json, null, 2);
+
+    renderValueResult(document.getElementById('resultValueBox'), json);
+  });
+
+
+  document.getElementById('formNational').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const json = await sendForm(e.target, '/api/identify/national');
+    ultimoResultadoNational = json;
+
+    console.log('Resultado nacional guardado:', ultimoResultadoNational);
+
+    document.getElementById('resultNational').textContent =
+      JSON.stringify(json, null, 2);
+
+    renderNationalResult(document.getElementById('resultNationalBox'), json);
+    renderCatalog(document.getElementById('catalogBox'), json);
+
+    const confirmBox = document.getElementById('confirmBox');
+    confirmBox.style.display = 'none';
+    confirmBox.innerHTML = '';
+  });
+
+</script>
+
+
+  
+</body>
+</html>

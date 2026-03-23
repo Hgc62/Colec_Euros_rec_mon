@@ -1,3 +1,4 @@
+require('dotenv').config();
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -13,6 +14,8 @@ var redirectToHTTPS = require('express-http-to-https').redirectToHTTPS;
 const passport = require('passport');
 var indexRouter = require('./routes/index');
 
+
+
 var app = express();
 
 // Habilitar trust proxy para Render
@@ -22,8 +25,13 @@ app.enable('trust proxy');
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
+//Para identificar monedas
+var apiIdentifyRouter = require('./routes/api_identify');
+app.use('/api', apiIdentifyRouter);
+
 //Para Render
-if (process.env.RENDER !== 'true') {
+//if (process.env.RENDER !== 'true') {
+if (process.env.RENDER === 'true') {
   app.use(redirectToHTTPS([/localhost:(\d{4})/], [], 301));
 }
 // La siguiente instrucción la quito para render

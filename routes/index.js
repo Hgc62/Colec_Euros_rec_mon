@@ -5,6 +5,9 @@ const monedasController = require('../controllers/monedas');
 const coleccionController = require('../controllers/coleccion');
 const userController = require('../controllers/user');
 const sessionController = require('../controllers/session');
+const multer = require('multer');
+const upload = multer();
+const { models } = require('../models');
 
 // Routes for the resource /login
 
@@ -79,7 +82,13 @@ router.get('/coleccion',                    sessionController.loginRequired, col
 router.get('/coleccion/formulario',         sessionController.loginRequired, coleccionController.formulario);
 router.get('/coleccion/show',               sessionController.loginRequired, coleccionController.show);
 router.get('/coleccion/new',                sessionController.loginRequired, coleccionController.new);
-router.post('/coleccion',                   sessionController.loginRequired, coleccionController.create);
+router.post(
+  '/coleccion',
+  sessionController.loginRequired,
+  sessionController.adminOrMyselfByNameRequired,
+  coleccionController.create
+);
+//router.post('/coleccion',                   sessionController.loginRequired, coleccionController.create);
 router.delete('/coleccion/:monedaId(\\d+)', sessionController.loginRequired, coleccionController.adminOrColeccionistaRequired, coleccionController.destroy);
 router.get('/coleccion/seeders',            sessionController.loginRequired, sessionController.adminRequired, coleccionController.seeders);
 router.get('/coleccion/tabla',              sessionController.loginRequired, coleccionController.tabla);
@@ -94,5 +103,85 @@ router.get('/users/:userId(\\d+)/edit', sessionController.loginRequired, session
 router.put('/users/:userId(\\d+)', sessionController.loginRequired, sessionController.adminOrMyselfRequired, userController.update);
 router.delete('/users/:userId(\\d+)', sessionController.loginRequired, sessionController.adminRequired, userController.destroy);
 router.get('/users/:userId(\\d+)/coleccion', sessionController.loginRequired, coleccionController.index);
+
+
+// Página de reconocimiento
+router.get('/identify', sessionController.loginRequired, function(req, res, next) {
+  res.render('identify');
+});
+
+// Confirmar moneda reconocida
+
+router.post(
+  '/identify/confirm',
+  sessionController.loginRequired,
+  upload.none(),
+  async function(req, res, next) {
+    try {
+      console.log('ENTRA EN /identify/confirm');
+      console.log('BODY:', req.body);
+
+      const {
+        pais,
+        valor,
+        tipo2e,
+        anio,
+        ceca,
+        monedaDetectada
+      } = req.body;
+
+      let moneda = valor;
+      let tipo = '';
+
+      if (valor === '2€' && tipo2e === 'conmemorativa') {
+        tipo = 'conmemorativa';
+
+        // IMPORTANTE:
+        // No fijar Com1 por defecto.
+        // Solo usar monedaDetectada si ya viene explícita y válida.
+        if (monedaDetectada && /^2€ Com[123]$/.test(monedaDetectada)) {
+          moneda = monedaDetectada;
+        } else {
+          moneda = null;
+        }
+      }
+
+      const usuarios = await models.Usuario.findAll({
+        order: [['nombre', 'ASC']]
+      });
+
+      return res.json({
+        ok: true,
+        monedaConfirmada: {
+          pais,
+          valor,
+          moneda,
+          anio: anio || null,
+          ceca: ceca || null,
+          tipo
+        },
+        loginUser: {
+          id: req.loginUser.id,
+          displayName: req.loginUser.displayName,
+          isAdmin: req.loginUser.isAdmin
+        },
+        usuarios: usuarios.map(u => ({
+          id: u.id,
+          nombre: u.nombre
+        }))
+      });
+
+    } catch (error) {
+      console.error('ERROR EN /identify/confirm:', error);
+
+      return res.status(500).json({
+        ok: false,
+        error: error.message || 'Error interno en confirmación'
+      });
+    }
+  }
+);
+
+
 
 module.exports = router;

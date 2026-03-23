@@ -476,3 +476,33 @@ exports.destroy = (req, res, next) => {
     });
   });
 };
+
+// Solo admin o el propio usuario (por nombre)
+exports.adminOrMyselfByNameRequired = (req, res, next) => {
+    try {
+        const coleccionistaNombre = req.body.coleccionista;
+
+        if (!coleccionistaNombre) {
+            req.flash('error', 'Falta el coleccionista.');
+            return res.redirect('/identify');
+        }
+
+        // Admin puede todo
+        if (req.loginUser.isAdmin) {
+            return next();
+        }
+
+        // Usuario normal: solo puede añadir a su propia colección
+        const mismoUsuario = req.loginUser.displayName === coleccionistaNombre;
+
+        if (mismoUsuario) {
+            return next();
+        }
+
+        req.flash('error', 'No tienes permiso para añadir monedas a otro coleccionista.');
+        return res.redirect('/identify');
+
+    } catch (error) {
+        next(error);
+    }
+};
