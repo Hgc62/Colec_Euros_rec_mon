@@ -7,7 +7,7 @@ const ai = new GoogleGenAI({
 });
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-
+/*
 const CATALOG_PATH = path.join(__dirname, '..', '..', 'data', 'catalogo.json');
 
 function loadCatalog() {
@@ -16,6 +16,7 @@ function loadCatalog() {
   }
   return JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
 }
+*/
 
 function buildInlineData(file) {
   return {
