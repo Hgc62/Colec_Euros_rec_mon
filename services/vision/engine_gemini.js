@@ -7,9 +7,18 @@ const ai = new GoogleGenAI({
 });
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-/*
+
 const CATALOG_PATH = path.join(__dirname, '..', '..', 'data', 'catalogo.json');
 
+function loadCatalog() {
+  if (!fs.existsSync(CATALOG_PATH)) {
+    console.log('⚠️ No hay catálogo local, se usa solo Gemini');
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+}
+
+/*
 function loadCatalog() {
   if (!fs.existsSync(CATALOG_PATH)) {
     throw new Error('No existe data/catalogo.json');
