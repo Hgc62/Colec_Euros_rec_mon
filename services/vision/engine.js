@@ -1,8 +1,8 @@
-const dhash = require('./engine_dhash');
-const phash = require('./engine_phash');
+//const dhash = require('./engine_dhash');
+//const phash = require('./engine_phash');
 const gemini = require('./engine_gemini');
 
-const ENGINE = process.env.VISION_ENGINE || 'dhash';
+const ENGINE = process.env.VISION_ENGINE || 'gemini';
 
 console.log('VISION ENGINE ACTIVO:', ENGINE);
 
