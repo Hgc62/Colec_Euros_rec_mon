@@ -118,8 +118,8 @@ router.post(
   upload.none(),
   async function(req, res, next) {
     try {
-      console.log('ENTRA EN /identify/confirm');
-      console.log('BODY:', req.body);
+      // console.log('ENTRA EN /identify/confirm');
+      // console.log('BODY:', req.body);
 
       const {
         pais,

@@ -1,2 +1,10 @@
 node_modules
 .env
+.env.ejemplo
+services/vision/engine_dhash.js
+services/vision/engine_phash.js
+services/vision/engine_openai.js
+services/vision/engine_python.js
+vision_service/
+log/
+*.sqlite

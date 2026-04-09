@@ -9,10 +9,26 @@ const Sequelize = require('sequelize');
 //    DATABASE_URL = sqlite:colec_euros.sqlite
 // To use  Heroku Postgres data base:
 //    DATABASE_URL = postgres://user:passwd@host:port/database
+const fs = require('fs');
 
-const url = process.env.DATABASE_URL || "sqlite:colec_euros.sqlite";
 
-const sequelize = new Sequelize(url);
+
+const url = process.env.DATABASE_URL || "sqlite:/data/colec_euros.sqlite";
+// const dbPath = proccess.env.DB_PATH || '/data/colec_euros.sqlite';
+
+const dbPath = process.env.DB_PATH || 'colec_euros.sqlite';
+const dir = path.dirname(dbPath);
+
+if (!fs.existsSync(dir)) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+// const sequelize = new Sequelize(url);
+
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: dbPath
+});
 
 // Import la definición de la tabla Coleccion  de coleccion.js
 //const Coleccion = sequelize.import(path.join(__dirname, 'coleccion'));

@@ -305,19 +305,19 @@ async function confirmCoin(json) {
   
 
   async function handleConfirmarMoneda() {
-    console.log('CLICK confirmar moneda');
+    // console.log('CLICK confirmar moneda');
 
     try {
       if (!ultimoResultadoNational) {
-        console.log('No existe ultimoResultadoNational');
+        // console.log('No existe ultimoResultadoNational');
         return;
       }
 
-      console.log('Enviando a confirm:', ultimoResultadoNational);
+      // console.log('Enviando a confirm:', ultimoResultadoNational);
 
       const confirmJson = await confirmCoin(ultimoResultadoNational);
 
-      console.log('Respuesta /identify/confirm:', confirmJson);
+      // console.log('Respuesta /identify/confirm:', confirmJson);
 
       renderConfirmedCoin(document.getElementById('confirmBox'), confirmJson);
     } catch (err) {
@@ -538,7 +538,7 @@ function verUsuariosConMonedaConfirmada(pais, tipo, valorBase, esConmemorativa) 
     const json = await sendForm(e.target, '/api/identify/national');
     ultimoResultadoNational = json;
 
-    console.log('Resultado nacional guardado:', ultimoResultadoNational);
+    // console.log('Resultado nacional guardado:', ultimoResultadoNational);
 
     document.getElementById('resultNational').textContent =
       JSON.stringify(json, null, 2);

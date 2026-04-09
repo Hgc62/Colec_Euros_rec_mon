@@ -11,7 +11,12 @@ const res = require("express/lib/response");
 const { where } = require("sequelize");
 const { KeyObject } = require("crypto");
 
-const FICHERO_LOG = `./log/Fichero_log.txt`;
+const FICHERO_LOG = process.env.LOG_PATH || './log/Fichero_log.txt';
+const dir = path.dirname(FICHERO_LOG);
+if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, {recursive: true});
+}
+
 
 //Promisificar writeFile
 function writeFileP(file, data) {
@@ -117,7 +122,7 @@ function construir_seeder(coleccion) {
         CABECERA,
         function (err) {
             if (err) throw err;
-            console.log('Cabecera añadida');
+            // console.log('Cabecera añadida');
         }
     );
 */
@@ -140,7 +145,7 @@ function construir_seeder(coleccion) {
             datos,
             function (err) {
                 if (err) throw err;
-                console.log('Dato añadido');
+                // console.log('Dato añadido');
             }
         );
 */
@@ -153,7 +158,7 @@ function construir_seeder(coleccion) {
         buffer,
         function (err) {
             if (err) throw err;
-            console.log('Seeders creado');
+            // console.log('Seeders creado');
         }
     );
 */
