@@ -75,7 +75,7 @@ module.exports = {
       },
       {
         nombre: "Luxemburgo",
-        num_series: 1,
+        num_series: 2,
         año_inicio: 2002,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -168,6 +168,13 @@ module.exports = {
         nombre: "Croacia",
         num_series: 1,
         año_inicio: 2022,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        nombre: "Bulgaria",
+        num_series: 1,
+        año_inicio: 2026,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
